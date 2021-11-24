@@ -52,25 +52,9 @@ type freq struct {
 	Count int
 }
 
-type freqs []freq
-
-func (f freqs) Len() int { return len(f) }
-
-func (f freqs) Swap(i, j int) { f[i], f[j] = f[j], f[i] }
-
-func (f freqs) Less(i, j int) bool {
-	if f[i].Count != f[j].Count {
-		// Sort by count descending
-		return f[i].Count > f[j].Count
-	}
-
-	// Then by key ascending
-	return f[i].Key < f[j].Key
-}
-
 func main() {
 	fields := make(map[string]int)
-	fieldsf := freqs{}
+	fieldsf := []freq{}
 
 	for _, s := range find(".", "os-release") {
 		lines, err := FileToLines(s)
@@ -90,7 +74,15 @@ func main() {
 		fieldsf = append(fieldsf, freq{Key: f, Count: c})
 	}
 
-	sort.Sort(fieldsf)
+	sort.Slice(fieldsf, func(i, j int) bool {
+		if fieldsf[i].Count != fieldsf[j].Count {
+			// Sort by count descending
+			return fieldsf[i].Count > fieldsf[j].Count
+		}
+
+		// Then by key ascending
+		return fieldsf[i].Key < fieldsf[j].Key
+	})
 
 	for _, f := range fieldsf {
 		fmt.Printf("%2d %s\n", f.Count, f.Key)
