@@ -76,12 +76,10 @@ func main() {
 
 	sort.Slice(fieldsf, func(i, j int) bool {
 		if fieldsf[i].Count != fieldsf[j].Count {
-			// Sort by count descending
 			return fieldsf[i].Count > fieldsf[j].Count
 		}
 
-		// Then by key ascending
-		return fieldsf[i].Key < fieldsf[j].Key
+		return fieldsf[i].Key > fieldsf[j].Key
 	})
 
 	for _, f := range fieldsf {
