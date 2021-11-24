@@ -47,16 +47,25 @@ func FileToLines(filePath string) (lines []string, err error) {
 	return lines, err
 }
 
+func percentage(num, denom int) int {
+	const oneHundred = 100
+
+	return int((float64(num) / float64(denom) * oneHundred))
+}
+
 type freq struct {
 	Key   string
 	Count int
 }
 
 func main() {
+	files := 0
 	fields := make(map[string]int)
 	fieldsf := []freq{}
 
 	for _, s := range find(".", "os-release") {
+		files++
+
 		lines, err := FileToLines(s)
 		if err != nil {
 			fmt.Println(err)
@@ -83,6 +92,6 @@ func main() {
 	})
 
 	for _, f := range fieldsf {
-		fmt.Printf("%2d %s\n", f.Count, f.Key)
+		fmt.Printf("%2d %s (%d%%)\n", f.Count, f.Key, percentage(f.Count, files))
 	}
 }
