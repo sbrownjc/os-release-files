@@ -1,3 +1,3 @@
 # os-release-files
 
-`go run . | sort -rn > fields`
+`go run . > fields`
