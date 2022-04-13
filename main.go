@@ -10,12 +10,14 @@ import (
 	"strings"
 )
 
-func find(root, ext string) (result []string) {
+// Find searches a given directory root for files matching the given extension,
+// and returns a list of filenames.
+func Find(root, ext string) (result []string) {
 	err := filepath.WalkDir(root, func(s string, d fs.DirEntry, e error) error {
 		if e != nil {
 			return e
 		}
-		if strings.HasSuffix(d.Name(), ext) {
+		if d.Type().IsRegular() && strings.HasSuffix(d.Name(), ext) {
 			result = append(result, s)
 		}
 
@@ -28,6 +30,7 @@ func find(root, ext string) (result []string) {
 	return result
 }
 
+// FileToLines takes a given file and splits it into lines.
 func FileToLines(filePath string) (lines []string, err error) {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -47,13 +50,16 @@ func FileToLines(filePath string) (lines []string, err error) {
 	return lines, err
 }
 
-func percentage(num, denom int) int {
+// WholePercentage determines the percentage of the num over the denom,
+// and returns an integer, unrounded.
+func WholePercentage(num, denom int) int {
 	const oneHundred = 100
 
 	return int((float64(num) / float64(denom) * oneHundred))
 }
 
-type freq struct {
+// Frequency is a struct for counting the number of instances of a given Key
+type Frequency struct {
 	Key   string
 	Count int
 }
@@ -61,9 +67,9 @@ type freq struct {
 func main() {
 	files := 0
 	fields := make(map[string]int)
-	fieldsf := []freq{}
+	fieldsf := []Frequency{}
 
-	for _, s := range find(".", "os-release") {
+	for _, s := range Find(".", "os-release") {
 		files++
 
 		lines, err := FileToLines(s)
@@ -80,7 +86,7 @@ func main() {
 	}
 
 	for f, c := range fields {
-		fieldsf = append(fieldsf, freq{Key: f, Count: c})
+		fieldsf = append(fieldsf, Frequency{Key: f, Count: c})
 	}
 
 	sort.Slice(fieldsf, func(i, j int) bool {
@@ -92,6 +98,6 @@ func main() {
 	})
 
 	for _, f := range fieldsf {
-		fmt.Printf("%2d %s (%d%%)\n", f.Count, f.Key, percentage(f.Count, files))
+		fmt.Printf("%2d %s (%d%%)\n", f.Count, f.Key, WholePercentage(f.Count, files))
 	}
 }
