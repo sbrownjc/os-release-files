@@ -8,7 +8,40 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"text/tabwriter"
+
+	"golang.org/x/exp/slices"
 )
+
+// Keys contained in the official spec: https://www.freedesktop.org/software/systemd/man/os-release.html
+var specKeys = []string{
+	"ANSI_COLOR",
+	"ARCHITECTURE",
+	"BUG_REPORT_URL",
+	"BUILD_ID",
+	"CPE_NAME",
+	"DEFAULT_HOSTNAME",
+	"DOCUMENTATION_URL",
+	"HOME_URL",
+	"ID_LIKE",
+	"ID",
+	"IMAGE_ID",
+	"IMAGE_VERSION",
+	"LOGO",
+	"NAME",
+	"PORTABLE_PREFIXES",
+	"PRETTY_NAME",
+	"PRIVACY_POLICY_URL",
+	"SUPPORT_END",
+	"SUPPORT_URL",
+	"SYSEXT_LEVEL",
+	"SYSEXT_SCOPE",
+	"VARIANT_ID",
+	"VARIANT",
+	"VERSION_CODENAME",
+	"VERSION_ID",
+	"VERSION",
+}
 
 // Find searches a given directory root for files matching the given extension,
 // and returns a list of filenames.
@@ -60,44 +93,104 @@ func WholePercentage(num, denom int) int {
 
 // Frequency is a struct for counting the number of instances of a given Key
 type Frequency struct {
-	Key   string
+	Name  string
 	Count int
+	OSes  map[string]struct{}
 }
 
-func main() {
-	files := 0
-	fields := make(map[string]int)
-	fieldsf := []Frequency{}
+// FieldsForFile parses an os-release file and returns the values for ID, VERSION_ID,
+// and the names of all fields contained within.
+func FieldsForFile(path string) (osid string, version string, fields []string) {
+	lines, err := FileToLines(path)
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	for _, s := range Find(".", "os-release") {
-		files++
+	for _, l := range lines {
+		split := strings.SplitN(l, "=", 2)
+		key := split[0]
+		if key != "" {
+			fields = append(fields, key)
+			value := strings.Trim(strings.TrimSpace(split[1]), `"`)
 
-		lines, err := FileToLines(s)
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		for _, l := range lines {
-			split := strings.SplitN(l, "=", 2)
-			if split[0] != "" {
-				fields[split[0]]++
+			if key == "ID" {
+				osid = value
+			}
+			if key == "VERSION_ID" {
+				version = value
 			}
 		}
 	}
 
-	for f, c := range fields {
-		fieldsf = append(fieldsf, Frequency{Key: f, Count: c})
+	return osid, version, fields
+}
+
+// MapKeys takes a set map and returns the keys in a sorted order
+func MapKeys(m map[string]struct{}) (keys []string) {
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func main() {
+	allOses := map[string]struct{}{}
+	fileCount := 0
+	fields := []string{}
+	fieldsfreq := map[string]Frequency{}
+
+	for _, s := range Find(".", "os-release") {
+		fileCount++
+		var osid string
+		osid, _, filefields := FieldsForFile(s)
+		for _, f := range filefields {
+			var ff Frequency
+			var ok bool
+			if ff, ok = fieldsfreq[f]; !ok {
+				fields = append(fields, f)
+				ff = Frequency{Name: f, OSes: map[string]struct{}{}}
+			}
+			ff.Count++
+			ff.OSes[osid] = struct{}{}
+			allOses[osid] = struct{}{}
+			fieldsfreq[f] = ff
+		}
 	}
 
-	sort.Slice(fieldsf, func(i, j int) bool {
-		if fieldsf[i].Count != fieldsf[j].Count {
-			return fieldsf[i].Count > fieldsf[j].Count
+	sort.SliceStable(fields, func(i, j int) bool {
+		// Sort by number of distros using the field
+		if len(fieldsfreq[fields[i]].OSes) != len(fieldsfreq[fields[j]].OSes) {
+			return len(fieldsfreq[fields[i]].OSes) > len(fieldsfreq[fields[j]].OSes)
 		}
 
-		return fieldsf[i].Key > fieldsf[j].Key
+		// Sort by number of files containing the field
+		// if fieldsfreq[fields[i]].Count != fieldsfreq[fields[j]].Count {
+		// 	return fieldsfreq[fields[i]].Count > fieldsfreq[fields[j]].Count
+		// }
+
+		// Sort by the field name
+		return fieldsfreq[fields[i]].Name < fieldsfreq[fields[j]].Name
+		// return fields[i] < fields[j]
 	})
 
-	for _, f := range fieldsf {
-		fmt.Printf("%2d %s (%d%%)\n", f.Count, f.Key, WholePercentage(f.Count, files))
+	writer := tabwriter.NewWriter(os.Stdout, 1, 1, 2, ' ', 0)
+
+	fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\n", "Count", "Field", "Spec", "Percent", "Distros")
+	for _, field := range fields {
+		key := fieldsfreq[field]
+		official := " "
+		if slices.Contains(specKeys, key.Name) {
+			official = "✓"
+		}
+		fmt.Fprintf(writer,
+			"%5d\t%s\t%4s\t%6d%%\t%s\n",
+			len(key.OSes), // key.Count,
+			key.Name,
+			official,
+			WholePercentage(len(key.OSes), len(allOses)),
+			MapKeys(key.OSes),
+		)
 	}
+	writer.Flush()
 }
