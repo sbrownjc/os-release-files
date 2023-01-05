@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"text/tabwriter"
 
+	"github.com/olekukonko/tablewriter"
 	"golang.org/x/exp/slices"
 )
 
@@ -140,7 +140,7 @@ func main() {
 	fields := []string{}
 	fieldsfreq := map[string]Frequency{}
 
-	for _, s := range Find(".", "os-release") {
+	for _, s := range Find("collection", "os-release") {
 		fileCount++
 		var osid string
 		osid, _, filefields := FieldsForFile(s)
@@ -174,23 +174,40 @@ func main() {
 		// return fields[i] < fields[j]
 	})
 
-	writer := tabwriter.NewWriter(os.Stdout, 1, 1, 2, ' ', 0)
+	readme, err := os.OpenFile("README.md", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	fmt.Fprint(readme, "# os-release-files\n\n")
+	fmt.Fprint(readme, "Running `go run main.go` will update this file using the files contained in the [collection dir](./collection).\n\n")
+	fmt.Fprint(readme, "The columns in the table are:\n\n")
+	fmt.Fprintln(readme, "- **COUNT**: Number of distros that contain this field")
+	fmt.Fprintln(readme, "- **FIELD**: Name of this field")
+	fmt.Fprintln(readme, "- **SPEC**: Is the field part of the the [os-release spec](https://www.freedesktop.org/software/systemd/man/os-release.html)?")
+	fmt.Fprintln(readme, "- **PERCENT**: Percentage of distros that contain this field")
+	fmt.Fprint(readme, "- **DISTROS**: List of IDs of distros that contain this field\n\n")
 
-	fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\n", "Count", "Field", "Spec", "Percent", "Distros")
+	table := tablewriter.NewWriter(readme)
+	table.SetHeader([]string{"Count", "Field", "Spec", "Percent", "Distros"})
+	table.SetColumnAlignment([]int{tablewriter.ALIGN_RIGHT, tablewriter.ALIGN_LEFT, tablewriter.ALIGN_CENTER, tablewriter.ALIGN_RIGHT, tablewriter.ALIGN_LEFT})
+	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+	table.SetCenterSeparator("|")
+	table.SetAutoWrapText(false)
+
 	for _, field := range fields {
 		key := fieldsfreq[field]
-		official := " "
+		var official string
 		if slices.Contains(specKeys, key.Name) {
 			official = "✓"
 		}
-		fmt.Fprintf(writer,
-			"%5d\t%s\t%4s\t%6d%%\t%s\n",
-			len(key.OSes), // key.Count,
+		table.Append([]string{
+			fmt.Sprintf("%d", len(key.OSes)),
 			key.Name,
 			official,
-			WholePercentage(len(key.OSes), len(allOses)),
-			MapKeys(key.OSes),
-		)
+			fmt.Sprintf("%d%%", WholePercentage(len(key.OSes), len(allOses))),
+			strings.Join(MapKeys(key.OSes), ", "),
+		})
 	}
-	writer.Flush()
+	table.Render()
 }
