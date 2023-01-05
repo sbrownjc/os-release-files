@@ -108,8 +108,8 @@ func FieldsForFile(path string) (osid string, version string, fields []string) {
 
 	for _, l := range lines {
 		split := strings.SplitN(l, "=", 2)
-		key := split[0]
-		if key != "" {
+		key := strings.TrimSpace(split[0])
+		if key != "" && !strings.HasPrefix(key, "#") {
 			fields = append(fields, key)
 			value := strings.Trim(strings.TrimSpace(split[1]), `"`)
 
