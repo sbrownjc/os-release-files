@@ -43,14 +43,13 @@ var specKeys = []string{
 	"VERSION",
 }
 
-// Find searches a given directory root for files matching the given extension,
-// and returns a list of filenames.
-func Find(root, ext string) (result []string) {
+// Find searches a given directory root for files and returns a list of filenames.
+func Find(root string) (result []string) {
 	err := filepath.WalkDir(root, func(s string, d fs.DirEntry, e error) error {
 		if e != nil {
 			return e
 		}
-		if d.Type().IsRegular() && strings.HasSuffix(d.Name(), ext) {
+		if d.Type().IsRegular() {
 			result = append(result, s)
 		}
 
@@ -140,7 +139,7 @@ func main() {
 	fields := []string{}
 	fieldsfreq := map[string]Frequency{}
 
-	for _, s := range Find("collection", "os-release") {
+	for _, s := range Find("collection") {
 		fileCount++
 		var osid string
 		osid, _, filefields := FieldsForFile(s)
@@ -181,6 +180,8 @@ func main() {
 	}
 	fmt.Fprint(readme, "# os-release-files\n\n")
 	fmt.Fprint(readme, "Running `go run main.go` will update this file using the files contained in the [collection dir](./collection).\n\n")
+	fmt.Fprint(readme, "Files are named after the PRETTY_NAME variable converted to lowercase and all non alphanumeric characters converted to dashes.\n\n")
+	fmt.Fprint(readme, "i.e. in ZSH: `source $f; name=${PRETTY_NAME:l}; name=${name//[^a-zA-Z0-9]/-}; mv $f $name`\n\n")
 	fmt.Fprint(readme, "The columns in the table are:\n\n")
 	fmt.Fprintln(readme, "- **COUNT**: Number of distros that contain this field")
 	fmt.Fprintln(readme, "- **FIELD**: Name of this field")

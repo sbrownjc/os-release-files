@@ -2,6 +2,10 @@
 
 Running `go run main.go` will update this file using the files contained in the [collection dir](./collection).
 
+Files are named after the PRETTY_NAME variable converted to lowercase and all non alphanumeric characters converted to dashes.
+
+i.e. in ZSH: `source $f; name=${PRETTY_NAME:l}; name=${name//[^a-zA-Z0-9]/-}; mv $f $name`
+
 The columns in the table are:
 
 - **COUNT**: Number of distros that contain this field
