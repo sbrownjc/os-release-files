@@ -6,11 +6,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/olekukonko/tablewriter"
-	"golang.org/x/exp/slices"
+	"golang.org/x/exp/maps"
 )
 
 // Keys contained in the official spec: https://www.freedesktop.org/software/systemd/man/os-release.html
@@ -99,7 +100,7 @@ type Frequency struct {
 
 // FieldsForFile parses an os-release file and returns the values for ID, VERSION_ID,
 // and the names of all fields contained within.
-func FieldsForFile(path string) (osid string, version string, fields []string) {
+func FieldsForFile(path string) (osid, version string, fields []string) {
 	lines, err := FileToLines(path)
 	if err != nil {
 		fmt.Println(err)
@@ -112,25 +113,16 @@ func FieldsForFile(path string) (osid string, version string, fields []string) {
 			fields = append(fields, key)
 			value := strings.Trim(strings.TrimSpace(split[1]), `"`)
 
-			if key == "ID" {
+			switch key {
+			case "ID":
 				osid = value
-			}
-			if key == "VERSION_ID" {
+			case "VERSION_ID":
 				version = value
 			}
 		}
 	}
 
 	return osid, version, fields
-}
-
-// MapKeys takes a set map and returns the keys in a sorted order
-func MapKeys(m map[string]struct{}) (keys []string) {
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 func main() {
@@ -202,12 +194,14 @@ func main() {
 		if slices.Contains(specKeys, key.Name) {
 			official = "✓"
 		}
+		keys := maps.Keys(key.OSes)
+		slices.Sort(keys)
 		table.Append([]string{
 			fmt.Sprintf("%d", len(key.OSes)),
 			key.Name,
 			official,
 			fmt.Sprintf("%d%%", WholePercentage(len(key.OSes), len(allOses))),
-			strings.Join(MapKeys(key.OSes), ", "),
+			strings.Join(keys, ", "),
 		})
 	}
 	table.Render()
